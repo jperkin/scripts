@@ -20,24 +20,75 @@ tftpserver="10.0.2.2"
 vmdir="`VBoxManage list systemproperties \
         | awk '/^Default.machine.folder/ {print $4}'`"
 
+usage()
+{
+    echo "Usage: mkvm [OPTIONS] <vmname>"
+    echo ""
+    echo "Supported options are:"
+    echo ""
+    echo "  -f <tftpfile>       Set tftp boot file, default pxelinux.0"
+    echo "  -h                  Print this usage"
+    echo "  -m <memsize>        Set size of RAM in MB, default 512"
+    echo "  -s <tftpserver>     Set IP address of TFTP server, default 10.0.2.2"
+    echo ""
+}
+
+while getopts "f:hm:o:s:" arg; do
+    case "${arg}" in
+    f)
+        tftpfile="${OPTARG}"
+        ;;
+    h)
+        usage
+        exit 2
+        ;;
+    m)
+        mem="${OPTARG}"
+        ;;
+    o)
+        ostype="${OPTARG}"
+        ;;
+    s)
+        tftpserver="${OPTARG}"
+        ;;
+    -)
+        break
+        ;;
+    ?)
+        usage
+        exit 2
+        ;;
+    esac
+done
+shift `expr ${OPTIND} - 1`
+
 if [ $# -ne 1 ]; then
-    echo "usage: mkvboxvm <name>"
+    usage
     exit 2
 fi
-
-vmname=$1; shift
+vmname="$1"; shift
 
 #
 # For now just support 64bit VMs..
 #
-case "${vmname}" in
-*[Oo]racle*[Ll]inux*)
-    ostype="Oracle_64"
-    ;;
-esac
+if [ -z "${ostype}" ]; then
+    case "${vmname}" in
+    *[Oo]racle*[Ll]inux*)
+        ostype="Oracle_64"
+        ;;
+    esac
+fi
 
 #
 # Ok, let's go:
+#
+#  - Check VM doesn't already exist
+#
+VBoxManage showvminfo "${vmname}" >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "ERROR: A VM named \"${vmname}\" already exists."
+    exit 1
+fi
 #
 #  - Create the basic VM
 #
