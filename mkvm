@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+#      Jonathan Perkin <jonathan@perkin.org.uk> wrote this file.
+#
+# You can freely distribute/modify it (and are encouraged to do so),
+# and you are welcome to buy me a beer if we ever meet and you think
+# this stuff is worth it.  Improvements and cleanups always welcome.
+#
+# Wrapper script around VirtualBox to provision new VMs quickly.
+#
+
+
+#
+# Defaults
+#
+nictype="Am79C973"
+mem="512"
+tftpfile="pxelinux.0"
+tftpserver="10.0.2.2"
+vmdir="`VBoxManage list systemproperties \
+        | awk '/^Default.machine.folder/ {print $4}'`"
+
+if [ $# -ne 1 ]; then
+    echo "usage: mkvboxvm <name>"
+    exit 2
+fi
+
+vmname=$1; shift
+
+#
+# For now just support 64bit VMs..
+#
+case "${vmname}" in
+*[Oo]racle*[Ll]inux*)
+    ostype="Oracle_64"
+    ;;
+esac
+
+#
+# Ok, let's go:
+#
+#  - Create the basic VM
+#
+VBoxManage createvm --name "${vmname}" ${ostype:+--ostype ${ostype}} --register
+#
+#  - Create the storage
+#
+VBoxManage createhd --filename "${vmdir}/${vmname}/${vmname}.vdi" --size 32768
+VBoxManage storagectl "${vmname}" --name "SATA Controller" --add sata \
+  --controller IntelAHCI
+VBoxManage storageattach "${vmname}" --storagectl "SATA Controller" --port 0 \
+  --device 0 --type hdd --medium "${vmdir}/${vmname}/${vmname}.vdi"
+#
+#  - Set miscellaneous configuration items
+#
+VBoxManage modifyvm "${vmname}" --boot1 disk --boot2 net --boot3 none
+VBoxManage modifyvm "${vmname}" --memory ${mem}
+#
+#  - Configure for net booting
+#
+VBoxManage modifyvm "${vmname}" --nictype1 "${nictype}"
+VBoxManage modifyvm "${vmname}" --nattftpserver1 "${tftpserver}"
+VBoxManage modifyvm "${vmname}" --nattftpfile1 "${tftpfile}"
+
+#
+# Everything should now be configured, start the VM
+#
+VirtualBox --startvm "${vmname}"
