@@ -73,6 +73,9 @@ vmname="$1"; shift
 #
 if [ -z "${ostype}" ]; then
     case "${vmname}" in
+    *[Oo]pen[Bb][Ss][Dd]*)
+        ostype="OpenBSD_64"
+        ;;
     *[Oo]racle*[Ll]inux*)
         ostype="Oracle_64"
         ;;
