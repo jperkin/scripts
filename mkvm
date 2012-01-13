@@ -16,7 +16,6 @@
 nictype="Am79C973"
 mem="512"
 tftpfile="pxelinux.0"
-tftpserver="10.0.2.2"
 vmdir="`VBoxManage list systemproperties \
         | awk '/^Default.machine.folder/ {print $4}'`"
 
@@ -29,7 +28,7 @@ usage()
     echo "  -f <tftpfile>       Set tftp boot file, default pxelinux.0"
     echo "  -h                  Print this usage"
     echo "  -m <memsize>        Set size of RAM in MB, default 512"
-    echo "  -s <tftpserver>     Set IP address of TFTP server, default 10.0.2.2"
+    echo "  -s <tftpserver>     Set IP address of TFTP server, by default use built-in"
     echo ""
 }
 
@@ -113,8 +112,10 @@ VBoxManage modifyvm "${vmname}" --memory ${mem}
 #  - Configure for net booting
 #
 VBoxManage modifyvm "${vmname}" --nictype1 "${nictype}"
-VBoxManage modifyvm "${vmname}" --nattftpserver1 "${tftpserver}"
 VBoxManage modifyvm "${vmname}" --nattftpfile1 "${tftpfile}"
+if [ -n "${tftpserver}" ]; then
+    VBoxManage modifyvm "${vmname}" --nattftpserver1 "${tftpserver}"
+fi
 
 #
 # Everything should now be configured, start the VM
