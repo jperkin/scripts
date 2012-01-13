@@ -121,6 +121,16 @@ if [ -n "${tftpserver}" ]; then
 fi
 
 #
+# Personal settings, you will likely want to remove them.
+#
+case "${vmname}" in
+*VPN*)
+    VBoxManage modifyvm "${vmname}" --natpf1 "SSH,tcp,,8022,,22"
+    VBoxManage modifyvm "${vmname}" --natpf1 "HTTP,tcp,,8080,,3128"
+    ;;
+esac
+
+#
 # Everything should now be configured, start the VM
 #
 VirtualBox --startvm "${vmname}"
