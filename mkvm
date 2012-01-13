@@ -78,6 +78,9 @@ if [ -z "${ostype}" ]; then
     *[Oo]racle*[Ll]inux*)
         ostype="Oracle_64"
         ;;
+    *Ubuntu*)
+        ostype="Ubuntu_64"
+        ;;
     esac
 fi
 
