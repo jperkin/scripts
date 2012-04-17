@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+
+if [ $# -lt 3 ]; then
+  echo "usage: joinpdf <output> <file1> <file2> <file..>" >&2
+  exit 2
+fi
+
+outfile=$1; shift
+
+gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile=${outfile} $* \
+  && echo "Written ${outfile}"
