@@ -17,12 +17,16 @@
 #
 # Nothing special, take .ts input file and create .mkv version
 #
-if [ $# -ne 1 ]; then
-    echo "usage: ts2mkv input.ts"
+if [ $# -lt 1 -o $# -gt 2 ]; then
+    echo "usage: ts2mkv input.ts <output.mkv>"
     exit 2
 fi
 
 infile=$1; shift
-outfile=`basename ${infile} | sed -e 's/.ts$/.mkv/'`
+if [ -n "$1" ]; then
+    outfile=$1; shift
+else
+    outfile=`basename ${infile} | sed -e 's/.ts$/.mkv/'`
+fi
 
 ffmpeg -i ${infile} -acodec copy -vcodec copy -map 0:0 -map 0:1 ${outfile}
