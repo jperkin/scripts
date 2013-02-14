@@ -17,7 +17,7 @@ vboxdir=$(VBoxManage list systemproperties \
 # Find a suitable md5sum program.
 #
 if type md5 >/dev/null 2>&1; then
-    md5sum='md5'
+    md5sum='md5 -q'
 elif type digest >/dev/null 2>&1 &&
      digest md5 /dev/null >/dev/null 2>&1; then
     md5sum='digest md5'
