@@ -18,17 +18,22 @@ vboxdir=$(VBoxManage list systemproperties \
 #
 if type md5 >/dev/null 2>&1; then
     md5sum='md5'
+    column='NF'
 elif type digest >/dev/null 2>&1 &&
      digest md5 /dev/null >/dev/null 2>&1; then
     md5sum='digest md5'
+    column='NF'
 elif type digest >/dev/null 2>&1 &&
      digest -a md5 /dev/null >/dev/null 2>&1; then
     md5sum='digest -a md5'
+    column='1'
 elif type md5sum >/dev/null 2>&1; then
     md5sum='md5sum'
+    column='1'
 elif type openssl >/dev/null 2>&1 &&
      openssl md5 -hex /dev/null >/dev/null 2>&1; then
     md5sum='openssl md5 -hex'
+    column='NF'
 else
     echo "ERROR: Sorry, could not find an md5 program" 1>&2
     exit 1
@@ -55,7 +60,7 @@ if [ ! -f "${vboxdir}/${vmname}/smartos-${smartos_version}.iso" ]; then
   curl -o "${vboxdir}/${vmname}/smartos-${smartos_version}.iso" \
           ${dlsite}/smartos-${smartos_version}.iso
   dl_md5=$(${md5sum} "${vboxdir}/${vmname}/smartos-${smartos_version}.iso" \
-             | awk '{ print $1 }')
+             | awk '{ print $'${column}' }')
   if [ -z "${dl_md5}" ]; then
     echo "ERROR: Couldn't fetch ISO image"
     exit 1
