@@ -4,9 +4,11 @@
 #
 #  - Disk size is in GB
 #  - Memory size is in MB
+#  - SSH port is the local forwarded port to the VM:22
 #
 disksize="32"
 memsize="1024"
+sshport="8322"
 vmname="SmartOS"
 dlsite="https://download.joyent.com/pub/iso"
 
@@ -101,8 +103,7 @@ else
     # Set misc settings
     VBoxManage modifyvm "${vmname}" --boot1 dvd --boot2 disk --boot3 none
     VBoxManage modifyvm "${vmname}" --memory ${memsize}
-    VBoxManage modifyvm "${vmname}" --pae off
-    VBoxManage modifyvm "${vmname}" --natpf1 "SSH,tcp,,8322,,22"
+    VBoxManage modifyvm "${vmname}" --natpf1 "SSH,tcp,,${sshport},,22"
 fi
 
 #
