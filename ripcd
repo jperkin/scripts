@@ -68,7 +68,7 @@ done
 if [ -n "${DISCID}" ]; then
 	CDDIR="${WAVDIR}/${DISCID}"
 else
-	CDDEV=$(diskutil list | grep CD_partition_scheme | awk '{print $NF}')
+	CDDEV=$(diskutil list | awk '/CD_partition_scheme/ {print $NF}')
 	if [ -z "${CDDEV}" ]; then
 		echo "ERROR: Could not read CD device." >&2
 		exit 1
