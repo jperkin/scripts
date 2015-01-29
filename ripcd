@@ -1,0 +1,194 @@
+#!/bin/bash
+#
+#      Jonathan Perkin <jonathan@perkin.org.uk> wrote this file.
+#
+# You can freely distribute/modify it (and are encouraged to do so),
+# and you are welcome to buy me a beer if we ever meet and you think
+# this stuff is worth it.  Improvements and cleanups always welcome.
+#
+# ripcd - rip and encode a CD to MP3/iTunes on OSX
+#
+
+#
+# Simple alternative to abcde to rip and encode a CD at high quality, I
+# was fed up with having to constantly hack abcde and found it easier,
+# cleaner, and faster just to write my own.
+#
+# Assumes OSX for iTunes, diskutil and sips.
+# Assumes abcde (cddb-tool), cd-discid, cdparanoia and lame from pkgsrc.
+#
+# ripcd is designed to be entirely procedural.  Multiple runs should
+# pick up from the previous state, and if everything has completed then
+# further runs do nothing.
+#
+# The steps are as follows:
+#
+#	1. Discover the discid, or use one specified on the command line
+#	   to resume an existing session.
+#
+#	2. Query the CDDB (FreeDB) for CD information, prompt the user to
+#	   choose (if necessary) and edit the result.
+#
+#	3. Rip the CD in full cdparanoia mode.
+#
+#	4. Prompt the user to scan in album art as full-size TIFF, then
+#	   convert to 900x900 JPEG for use.  For the reasons behind these
+#	   settings see https://gist.github.com/jperkin/4444132
+#
+#	5. Encode high-quality MP3s using all the supplied information,
+#	   and import directly into iTunes if necessary.
+#
+# TODO: Up-to-date checks, so that e.g. if a user wants to update the CDDB
+# TODO: entry or cover.tiff, all subsequent steps will be re-run to pick up
+# TODO: the new information.
+#
+
+CDDBURL="http://freedb.freedb.org/~cddb/cddb.cgi 6 ripcd ripcd"
+WAVDIR="${HOME}/Music/CDs"
+MP3DIR="${HOME}/Music/iTunes/iTunes Media/Automatically Add to iTunes.localized"
+
+while getopts "D:hx" opt; do
+	case "$opt" in
+	D)
+		DISCID=$OPTARG
+		;;
+	h|\?|\*)
+		echo "usage: $0 [-hx] [-D discid]" >&2
+		exit 2
+		;;
+	x)
+		set -x
+		;;
+	esac
+done
+
+#
+# Step 1.  If a discid wasn't supplied, find it and save the discinfo.
+#
+if [ -n "${DISCID}" ]; then
+	CDDIR="${WAVDIR}/${DISCID}"
+else
+	CDDEV=$(diskutil list | grep CD_partition_scheme | awk '{print $NF}')
+	if [ -z "${CDDEV}" ]; then
+		echo "ERROR: Could not read CD device." >&2
+		exit 1
+	fi
+	DISCID=$(cd-discid /dev/r${CDDEV} | awk '{print $1}')
+	CDDIR="${WAVDIR}/${DISCID}"
+	mkdir -p ${CDDIR}
+	cd-discid /dev/r${CDDEV} >${CDDIR}/discinfo
+fi
+
+if [ ! -f "${CDDIR}/discinfo" ]; then
+	echo "ERROR: ${CDDIR}/discinfo not found." >&2
+	exit 1
+fi
+DISCINFO=$(<${CDDIR}/discinfo)
+TRACKS=$(echo ${DISCINFO} | awk '{print $2}')
+
+#
+# Step 2.  CDDB.  Query the DB, select an appropriate match or generate a new
+# template, then edit the result.
+#
+if [ ! -f "${CDDIR}/cddbread" ]; then
+	cats=$(cddb-tool query ${CDDBURL} ${DISCINFO} | awk '
+		BEGIN { status=1 }
+		/^210/ { status=0 }
+		/^[a-z]/ && status == 0 { print $1; }
+		END { exit status }
+	')
+	if [ $? -eq 0 ]; then
+		i=0
+		for c in ${cats}; do
+			cddb-tool read ${CDDBURL} ${c} ${DISCID} \
+			    | tr -d '\r' >${CDDIR}/cddbread.${i}
+			i=$((i+1))
+		done
+		#
+		# If there's only one match, use it.  Otherwise present the
+	       	# user options and use their preferred choice.
+		if [ $i -eq 1 ]; then
+			mv ${CDDIR}/cddbread.1 ${CDDIR}/cddbread
+		else
+			for j in $(seq 0 $(($i-1))); do
+				echo "Choice #$j:"
+				awk '/^[DT]/ {print}' ${CDDIR}/cddbread.$j
+				echo ""
+			done
+			printf "Choose one result: "
+			read choice
+			if [ -f ${CDDIR}/cddbread.${choice} ]; then
+				mv ${CDDIR}/cddbread.${choice} ${CDDIR}/cddbread
+				rm -f ${CDDIR}/cddbread.*
+			else
+				echo "ERROR: No such choice available." >&2
+				rm -f ${CDDIR}/cddbread.*
+				exit 1
+			fi
+		fi
+	else
+		cddb-tool template ${DISCINFO} >${CDDIR}/cddbread
+	fi
+
+	# Edit the result regardless.
+	${EDITOR:-vi} ${CDDIR}/cddbread
+fi
+
+#
+# Step 3.  Rip using full cdparanoia mode.
+#
+for t in $(seq -f "%02g" 1 ${TRACKS}); do
+	if [ ! -f ${CDDIR}/track${t}.wav ]; then
+		cdparanoia -X ${t} ${CDDIR}/track${t}.wav
+	fi
+done
+
+#
+# Step 4.  Album Art.
+#
+if [ ! -f "${CDDIR}/cover.tiff" ]; then
+	echo "Scan the CD cover at 600DPI, put the resulting cover.tiff"
+	echo "into ${CDDIR} and then hit return."
+	read nothing
+	if [ ! -f "${CDDIR}/cover.tiff" ]; then
+		echo "ERROR: cover.tiff not found, try again."
+		exit 1
+	fi
+fi
+
+if [ ! -f "${CDDIR}/cover.jpg" ]; then
+	echo "Creating ${CDDIR}/cover.jpg"
+	sips -s format jpeg -Z 900 "${CDDIR}/cover.tiff" \
+	     --out "${CDDIR}/cover.jpg" >/dev/null 2>&1
+fi
+
+#
+# Step 5.  MP3 encoding directly into iTunes, which will then handle creating
+# the directory layout appropriately.  Output to a temporary file first as
+# iTunes gets confused if files are still being written to.
+#
+# Query iTunes to see if the album already exists with the correct number of
+# tracks, if so do nothing (unless forced), otherwise encode all.  Duplicates
+# will be ignored.
+#
+ARTIST=$(sed -ne 's/^DTITLE=\(.*\) \/.*/\1/p' ${CDDIR}/cddbread)
+ALBUM=$(sed -ne 's/^DTITLE.*\/ //p' ${CDDIR}/cddbread)
+YEAR=$(sed -ne 's/^DYEAR=//p' ${CDDIR}/cddbread)
+GENRE=$(sed -ne 's/^DGENRE=//p' ${CDDIR}/cddbread)
+
+DONETRACKS=$(osascript <<-EOF
+	tell application "iTunes"
+	    count (tracks whose artist is "${ARTIST}" and album is "${ALBUM}")
+	end tell
+	EOF)
+
+if [ ${DONETRACKS} -ne ${TRACKS} ]; then
+	for t in $(seq -f "%02g" 1 ${TRACKS}); do
+		title=$(sed -ne "s/^TTITLE$((10#${t}-1))=//p" ${CDDIR}/cddbread)
+		lame -V2 --tt "${title}" --ta "${ARTIST}" --tl "${ALBUM}" \
+		     --ty "${YEAR}" --tn "${t}/${TRACKS}" --tg "${GENRE}" \
+		     --ti "${CDDIR}/cover.jpg" ${CDDIR}/track${t}.wav \
+		     "${CDDIR}/track${t}.mp3"
+		mv "${CDDIR}/track${t}.mp3" "${MP3DIR}/"
+	done
+fi
