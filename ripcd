@@ -184,7 +184,8 @@ DONETRACKS=$(osascript <<-EOF
 
 if [ ${DONETRACKS} -ne ${TRACKS} ]; then
 	for t in $(seq -f "%02g" 1 ${TRACKS}); do
-		title=$(sed -ne "s/^TTITLE$((10#${t}-1))=//p" ${CDDIR}/cddbread)
+		title=$(sed -ne "s/^TTITLE$((10#${t}-1))=//p" \
+		    ${CDDIR}/cddbread | tr -d '\n')
 		lame -V2 --tt "${title}" --ta "${ARTIST}" --tl "${ALBUM}" \
 		     --ty "${YEAR}" --tn "${t}/${TRACKS}" --tg "${GENRE}" \
 		     --ti "${CDDIR}/cover.jpg" ${CDDIR}/track${t}.wav \
