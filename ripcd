@@ -44,16 +44,19 @@
 #
 
 CDDBURL="http://freedb.freedb.org/~cddb/cddb.cgi 6 ripcd ripcd"
-WAVDIR="${HOME}/Music/CDs"
+OUTDIR="${HOME}/Music/CDs"
 MP3DIR="${HOME}/Music/iTunes/iTunes Media/Automatically Add to iTunes.localized"
 
-while getopts "D:hx" opt; do
+while getopts "D:d:hx" opt; do
 	case "$opt" in
 	D)
 		DISCID=$OPTARG
 		;;
+	d)
+		OUTDIR=$OPTARG
+		;;
 	h|\?|\*)
-		echo "usage: $0 [-hx] [-D discid]" >&2
+		echo "usage: $0 [-hx] [-D discid] [-d outdir]" >&2
 		exit 2
 		;;
 	x)
@@ -61,12 +64,13 @@ while getopts "D:hx" opt; do
 		;;
 	esac
 done
+shift $((OPTIND - 1))
 
 #
 # Step 1.  If a discid wasn't supplied, find it and save the discinfo.
 #
 if [ -n "${DISCID}" ]; then
-	CDDIR="${WAVDIR}/${DISCID}"
+	CDDIR="${OUTDIR}/${DISCID}"
 else
 	CDDEV=$(diskutil list | awk '/CD_partition_scheme/ {print $NF}')
 	if [ -z "${CDDEV}" ]; then
@@ -74,7 +78,7 @@ else
 		exit 1
 	fi
 	DISCID=$(cd-discid /dev/r${CDDEV} | awk '{print $1}')
-	CDDIR="${WAVDIR}/${DISCID}"
+	CDDIR="${OUTDIR}/${DISCID}"
 	mkdir -p ${CDDIR}
 	cd-discid /dev/r${CDDEV} >${CDDIR}/discinfo
 fi
@@ -106,7 +110,8 @@ if [ ! -f "${CDDIR}/cddbread" ]; then
 		done
 		#
 		# If there's only one match, use it.  Otherwise present the
-	       	# user options and use their preferred choice.
+		# user options and use their preferred choice.
+		#
 		if [ $i -eq 1 ]; then
 			mv ${CDDIR}/cddbread.1 ${CDDIR}/cddbread
 		else
