@@ -43,12 +43,16 @@
 # TODO: the new information.
 #
 
+ADDANYWAY=false
 CDDBURL="http://freedb.freedb.org/~cddb/cddb.cgi 6 ripcd ripcd"
 OUTDIR="${HOME}/Music/CDs"
 MP3DIR="${HOME}/Music/iTunes/iTunes Media/Automatically Add to iTunes.localized"
 
-while getopts "D:d:hx" opt; do
+while getopts "AD:d:hx" opt; do
 	case "$opt" in
+	A)
+		ADDANYWAY=true
+		;;
 	D)
 		DISCID=$OPTARG
 		;;
@@ -56,7 +60,7 @@ while getopts "D:d:hx" opt; do
 		OUTDIR=$OPTARG
 		;;
 	h|\?|\*)
-		echo "usage: $0 [-hx] [-D discid] [-d outdir]" >&2
+		echo "usage: $0 [-Ahx] [-D discid] [-d outdir]" >&2
 		exit 2
 		;;
 	x)
@@ -187,7 +191,7 @@ DONETRACKS=$(osascript <<-EOF
 	end tell
 	EOF)
 
-if [ ${DONETRACKS} -ne ${TRACKS} ]; then
+if [ ${DONETRACKS} -ne ${TRACKS} ] || ${ADDANYWAY}; then
 	for t in $(seq -f "%02g" 1 ${TRACKS}); do
 		title=$(sed -ne "s/^TTITLE$((10#${t}-1))=//p" \
 		    ${CDDIR}/cddbread | tr -d '\n')
