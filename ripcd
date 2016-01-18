@@ -185,6 +185,14 @@ ALBUM=$(sed -ne 's/^DTITLE.*\/ //p' ${CDDIR}/cddbread)
 YEAR=$(sed -ne 's/^DYEAR=//p' ${CDDIR}/cddbread)
 GENRE=$(sed -ne 's/^DGENRE=//p' ${CDDIR}/cddbread)
 
+case "${ALBUM}" in
+*Disc?[1-9]/[1-9]*)
+	discn="${ALBUM##*Disc }"
+	discn="--tv TPOS=${discn%)}"
+	ALBUM="${ALBUM%% (Disc*}"
+	;;
+esac
+
 DONETRACKS=$(osascript <<-EOF
 	tell application "iTunes"
 	    count (tracks whose artist is "${ARTIST}" and album is "${ALBUM}")
@@ -193,12 +201,17 @@ DONETRACKS=$(osascript <<-EOF
 
 if [ ${DONETRACKS} -ne ${TRACKS} ] || ${ADDANYWAY}; then
 	for t in $(seq -f "%02g" 1 ${TRACKS}); do
-		title=$(sed -ne "s/^TTITLE$((10#${t}-1))=//p" \
-		    ${CDDIR}/cddbread | tr -d '\n')
-		lame -V2 --tt "${title}" --ta "${ARTIST}" --tl "${ALBUM}" \
+		artist="${ARTIST}"
+		title=$(sed -ne "s/^TTITLE$((10#${t}-1))=//p" ${CDDIR}/cddbread | tr -d '\n')
+		if [ "${ARTIST}" = "Various" ]; then
+			artist="${title%% / *}"
+			title="${title##* / }"
+			compilation="--tv TCMP=1"
+		fi
+		lame -V2 --tt "${title}" --ta "${artist}" --tl "${ALBUM}" \
 		     --ty "${YEAR}" --tn "${t}/${TRACKS}" --tg "${GENRE}" \
-		     --ti "${CDDIR}/cover.jpg" ${CDDIR}/track${t}.wav \
-		     "${CDDIR}/track${t}.mp3"
-		mv "${CDDIR}/track${t}.mp3" "${MP3DIR}/"
+		     --ti "${CDDIR}/cover.jpg" ${compilation} ${discn} \
+		     ${CDDIR}/track${t}.wav "/tmp/track${t}.mp3"
+		mv "/tmp/track${t}.mp3" "${MP3DIR}/"
 	done
 fi
