@@ -65,8 +65,7 @@ gpg --output ${ENCRYPTFILE} --encrypt --armor -r ${PGPKEYID} ${PLAINFILE}
 
 # Remove unencrypted file after scrubbing it.
 fsize=$(du -sk ${PLAINFILE} | awk '{print $1}')
-which shred >/dev/null 2>/dev/null
-if test $? -eq 0; then
+if command -v shred >/dev/null 2>/dev/null; then
     shred ${PLAINFILE}
 else
     dd if=/dev/urandom of=${PLAINFILE} bs=1k count=${fsize} conv=notrunc,fsync 2>/dev/null
