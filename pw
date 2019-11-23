@@ -12,7 +12,7 @@
 
 PLAINFILE="$HOME/.pw"
 ENCRYPTFILE="${PLAINFILE}.gpg"
-PGPKEYID="jonathan@perkin.org.uk"
+PGPKEYID="${PGPKEYID:-jonathan@perkin.org.uk}"
 
 : ${EDITOR=vi}
 
@@ -65,7 +65,12 @@ gpg --output ${ENCRYPTFILE} --encrypt --armor -r ${PGPKEYID} ${PLAINFILE}
 
 # Remove unencrypted file after scrubbing it.
 fsize=$(du -sk ${PLAINFILE} | awk '{print $1}')
-dd if=/dev/urandom of=${PLAINFILE} bs=1k count=${fsize} conv=notrunc,fsync 2>/dev/null
+which shred >/dev/null 2>/dev/null
+if test $? -eq 0; then
+    shred ${PLAINFILE}
+else
+    dd if=/dev/urandom of=${PLAINFILE} bs=1k count=${fsize} conv=notrunc,fsync 2>/dev/null
+fi
 rm -f ${PLAINFILE} ${PLAINFILE}.touched
 
 # Ensure sane file permissions on encrypted files.
